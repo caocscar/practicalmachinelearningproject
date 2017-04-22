@@ -1,7 +1,7 @@
 ---
 title: "Practical Machine Learning Project"
 author: "Alex Cao"
-date: "April 14, 2017"
+date: "April 22, 2017"
 output: html_document
 ---
 
@@ -60,7 +60,6 @@ train = training_clean[inTrain,]
 test = training_clean[-inTrain,]
 ```
 
-
 ## Model Building
 
 We set up our 5-fold cross-validation and train three different models: random forest, C5.0 and gradient boosting machines. We test the accuracy of the models against our test dataset we partitioned.
@@ -100,6 +99,8 @@ accuracy_stacked = confusionMatrix(test$classe, prediction_stacked)
 accuracy_stacked$table
 ```
 
+The accuracy for our stacked algorithms is 84.9%. This has the highest accuracy so we will use this for the quiz. We expect an out-of-sample error of 15.1%. 
+
 # Quiz
 
 Below we generate our predictions for the quiz.
@@ -118,4 +119,7 @@ for (i in seq(1:20)) {
     quiz_prediction[i] = row.names(tally)[which.max(tally)]
 }
 ```
+
+We ended up getting 17/20 predictions correct.
+
 

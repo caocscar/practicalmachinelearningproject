@@ -11,7 +11,7 @@
 
 <meta name="author" content="Alex Cao" />
 
-<meta name="date" content="2017-04-14" />
+<meta name="date" content="2017-04-22" />
 
 <title>Practical Machine Learning Project</title>
 
@@ -119,7 +119,7 @@ $(document).ready(function () {
 
 <h1 class="title toc-ignore">Practical Machine Learning Project</h1>
 <h4 class="author"><em>Alex Cao</em></h4>
-<h4 class="date"><em>April 14, 2017</em></h4>
+<h4 class="date"><em>April 22, 2017</em></h4>
 
 </div>
 
@@ -217,6 +217,7 @@ accuracy_stacked$table</code></pre>
 ##          C  1  0 20  0  0
 ##          D  1  1  1 16  1
 ##          E  0  0  1  1 21</code></pre>
+<p>The accuracy for our stacked algorithms is 84.9%. This has the highest accuracy so we will use this for the quiz. We expect an out-of-sample error of 15.1%.</p>
 </div>
 <div id="quiz" class="section level1">
 <h1>Quiz</h1>
@@ -233,6 +234,7 @@ for (i in seq(1:20)) {
     tally = table(c(row[[1]],row[[2]],row[[3]]))
     quiz_prediction[i] = row.names(tally)[which.max(tally)]
 }</code></pre>
+<p>We ended up getting 17/20 predictions correct.</p>
 </div>
 
 
