@@ -6,25 +6,116 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message=F, warning=F)
 ```
 
-## R Markdown
+## Summary
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+This document shows the methodology used to create a prediction model for classifying how well people performed dumbbell exercises. The data consists of accelerometer data from human subjects doing these exercises. The exercises have been classified into 5 categorical groups based no how well they performed the exercises. The goal is to predict how well they did the exercise. Three different machine learning algorithms (random forests, C5.0, gradient boosting machine) were used. 5-fold cross validation was used to construct each individual model. An ensemble method was found to have the highest accuracy (84.9%) based on a partition test set. The accuracy was based on an out-of-sample test set. This model scored 85% on the project quiz.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+## Pre-processing
 
-```{r cars}
-summary(cars)
+```{r import, echo=FALSE}
+library(caret)
 ```
 
-## Including Plots
+We had to perform a bit of a cheat by looking at the validation dataset to see which of the variables had values vs. NAs only. No use designing a model based on variables which you won't have access to during the prediction phase. We start by only including the columns that have sensor data (no dates, indices etc.) plus the user. We then write two functions to convert a factor variable into a numeric variable. We then determine which columns are logical types which, in this case, indicate they possess all NAs and filter them out. This gives us a tidy dataset which we can build a model upon.
 
-You can also embed plots, for example:
+```{r preprocess_validate}
+validate = read.csv("pml-testing.csv", na.strings = c("NA","#DIV/0!"))
+user_name = validate$user_name
+validate = validate[,8:160]
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+asNumeric <- function(x) {
+    as.numeric(as.character(x))
+}
+factorsNumeric <- function(df) {
+    modifyList(df, lapply(df[, sapply(df, is.factor)], asNumeric))
+}
+
+validate = factorsNumeric(validate)
+validate = cbind(user_name,validate)
+na_cols = sapply(validate, is.logical)
+validate_clean = validate[,!na_cols]
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+We apply the same pre-processing steps to the training dataset. The only exception is we use only the rows where `new_window == y` as a filter for the rows that have summary data.
+
+```{r preprocess_training, results="hide"}
+training = read.csv("pml-training.csv", na.strings = c("NA","#DIV/0!"))
+training = training[training$new_window == 'yes',]
+user_name = training$user_name
+training = training[,8:160]
+training = factorsNumeric(training)
+training = cbind(user_name,training)
+training_clean = training[,!na_cols]
+```
+
+We set our random seed then partition the training dataset into a train and test set so we can refine our models without bias against the validation dataset.
+
+```{r partition}
+set.seed(29205)
+inTrain = createDataPartition(training_clean$classe, p = 0.7)[[1]]
+train = training_clean[inTrain,]
+test = training_clean[-inTrain,]
+```
+
+
+## Model Building
+
+We set up our 5-fold cross-validation and train three different models: random forest, C5.0 and gradient boosting machines. We test the accuracy of the models against our test dataset we partitioned.
+
+```{r cross validation training model, results="hide"}
+train_ctrl = trainControl(method='cv', number=5)
+
+# random forests
+rf = train(classe ~ ., data=train, method='rf', trControl=train_ctrl)
+predictions_rf = predict(rf, test)
+accuracy_rf = confusionMatrix(test$classe, predictions_rf)
+
+# C5.0 classification
+c5 = train(classe ~ ., data=train, method='C5.0', trControl=train_ctrl)
+predictions_c5 = predict(c5, test)
+accuracy_c5 = confusionMatrix(test$classe, predictions_c5)
+
+# gradient boosting machine
+gbm = train(classe ~ ., data=train, method='gbm', preProcess="pca", trControl=train_ctrl)
+predictions_gbm = predict(gbm, test)
+accuracy_gbm = confusionMatrix(test$classe, predictions_gbm)
+```
+Here is the confusion matrix for each model.
+```{r confusion}
+accuracy_rf$table
+accuracy_c5$table
+accuracy_gbm$table
+```
+
+The accuracy for the 3 models were respectively 76.5%, 79.0%, 73.1%. We stack out algorithms to see if we can increase our accuracy.
+
+```{r stacked}
+stacked_df = data.frame(predictions_rf, predictions_c5, predictions_gbm, classe=test$classe)
+combined_model = train(classe ~ ., method='rf', data=stacked_df)
+prediction_stacked = predict(combined_model, stacked_df)
+accuracy_stacked = confusionMatrix(test$classe, prediction_stacked)
+accuracy_stacked$table
+```
+
+# Quiz
+
+Below we generate our predictions for the quiz.
+
+```{r quiz}
+quiz_rf = predict(rf, validate_clean)
+quiz_c5 = predict(c5, validate_clean)
+quiz_gbm = predict(gbm, validate_clean)
+quiz_stacked = data.frame(quiz_rf, quiz_c5, quiz_gbm)
+
+# hack for calculating majority vote
+quiz_prediction = 0
+for (i in seq(1:20)) {
+    row = quiz_stacked[i,]
+    tally = table(c(row[[1]],row[[2]],row[[3]]))
+    quiz_prediction[i] = row.names(tally)[which.max(tally)]
+}
+```
+
